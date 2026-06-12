@@ -1,0 +1,16 @@
+target/
+*.db
+.idea/
+*.iml
+.DS_Store
+*.class
+*.log
+*.jar
+*.war
+*.zip
+*.tar.gz
+.vscode/
+.settings/
+.project
+.classpath
+/bin/
