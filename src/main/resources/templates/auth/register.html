@@ -31,8 +31,33 @@
                         <label for="password" class="form-label">Password</label>
                         <input type="password" id="password" th:field="*{password}"
                                class="form-control" th:classappend="${#fields.hasErrors('password')} ? 'is-invalid' : ''"
-                               placeholder="Almeno 8 caratteri">
+                               placeholder="Almeno 8 caratteri" oninput="checkPasswordStrength()">
                         <div class="invalid-feedback" th:errors="*{password}">Errore password</div>
+
+                        <div class="mt-2 small" id="passwordRequirements">
+                            <div class="text-muted mb-1">La password deve contenere:</div>
+                            <ul class="list-unstyled mb-0">
+                                <li id="req-length" class="text-muted">
+                                    <i class="bi bi-circle"></i> Almeno 8 caratteri
+                                </li>
+                                <li id="req-upper" class="text-muted">
+                                    <i class="bi bi-circle"></i> Almeno una lettera maiuscola
+                                </li>
+                                <li id="req-lower" class="text-muted">
+                                    <i class="bi bi-circle"></i> Almeno una lettera minuscola
+                                </li>
+                                <li id="req-special" class="text-muted">
+                                    <i class="bi bi-circle"></i> Almeno un carattere speciale
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="mt-2" id="passwordStrength" style="display:none;">
+                            <div class="progress" style="height: 8px;">
+                                <div id="strengthBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <small id="strengthLabel" class="mt-1 d-block"></small>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -58,6 +83,71 @@
             </div>
         </div>
     </div>
+<script>
+function checkPasswordStrength() {
+    const password = document.getElementById('password').value;
+    const strengthDiv = document.getElementById('passwordStrength');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthLabel = document.getElementById('strengthLabel');
+
+    const hasLength = password.length >= 8;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    updateRequirement('req-length', hasLength);
+    updateRequirement('req-upper', hasUpper);
+    updateRequirement('req-lower', hasLower);
+    updateRequirement('req-special', hasSpecial);
+
+    let score = 0;
+    if (hasLength) score++;
+    if (hasUpper) score++;
+    if (hasLower) score++;
+    if (hasSpecial) score++;
+
+    if (password.length === 0) {
+        strengthDiv.style.display = 'none';
+        return;
+    }
+    strengthDiv.style.display = 'block';
+
+    let percent, level, barColor, textColor;
+    if (score <= 2) {
+        percent = 33;
+        level = 'Scarsa';
+        barColor = 'bg-danger';
+        textColor = 'text-danger';
+    } else if (score === 3) {
+        percent = 66;
+        level = 'Buona';
+        barColor = 'bg-warning';
+        textColor = 'text-warning';
+    } else {
+        percent = 100;
+        level = 'Eccellente';
+        barColor = 'bg-success';
+        textColor = 'text-success';
+    }
+
+    strengthBar.style.width = percent + '%';
+    strengthBar.className = 'progress-bar ' + barColor;
+    strengthLabel.textContent = level;
+    strengthLabel.className = 'mt-1 d-block fw-semibold ' + textColor;
+}
+
+function updateRequirement(id, met) {
+    const el = document.getElementById(id);
+    const icon = el.querySelector('i');
+    if (met) {
+        icon.className = 'bi bi-check-circle-fill text-success';
+        el.className = 'text-success';
+    } else {
+        icon.className = 'bi bi-circle text-muted';
+        el.className = 'text-muted';
+    }
+}
+</script>
 </div>
 </body>
 </html>

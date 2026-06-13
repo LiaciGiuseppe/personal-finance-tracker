@@ -28,9 +28,11 @@ Applicazione web per la gestione delle finanze personali, sviluppata con **Sprin
 - Registrare transazioni con importo, tipo (entrata/uscite), data, descrizione, categoria e metodo di pagamento
 - Pianificare transazioni future con ricorrenza settimanale, mensile o annuale
 - Filtrare lo storico per intervallo di date e per categoria
-- Visualizzare un riepilogo immediato in dashboard con totali entrate, uscite e saldo
+- Visualizzare un riepilogo immediato in dashboard con totali entrate, uscite, saldo e grafico dell'andamento nel tempo (con zoom/pan)
 - Esportare i dati in Excel con raggruppamento mensile, statistiche per anno e riepilogo complessivo
-- Gestire utenti con registrazione, autenticazione e ruoli (USER e ADMIN)
+- Registrazione con indicatore di sicurezza della password (forza: scarsa/buona/eccellente)
+- Gestire il proprio profilo: cambio password ed eliminazione account
+- Gestire utenti con autenticazione e ruoli (USER e ADMIN)
 
 ---
 
@@ -49,6 +51,8 @@ Applicazione web per la gestione delle finanze personali, sviluppata con **Sprin
 | **Apache POI** | 5.2.5 | Generazione file Excel (.xlsx) |
 | **Lombok** | 1.18 | Riduzione boilerplate Java |
 | **Bootstrap 5** | 5.3.3 | CSS framework (via CDN) |
+| **Chart.js** | 4.4.7 | Grafici dashboard (via CDN) |
+| **chartjs-plugin-zoom** | 2.2.0 | Zoom/Pan grafico (via CDN) |
 | **Maven** | - | Build tool e gestione dipendenze |
 
 ### Dipendenze Maven (pom.xml)
@@ -98,7 +102,7 @@ L'applicazione segue il pattern **Model-View-Controller** implementato da Spring
 
 | Livello | Componenti | Responsabilità |
 |---|---|---|
-| **Controller** | `AuthController`, `DashboardController`, `TransactionController`, `ExportController`, `AdminController` | Riceve le richieste HTTP, valida input, chiama i Service, popola il Model e restituisce la View |
+| **Controller** | `AuthController`, `DashboardController`, `TransactionController`, `ExportController`, `ProfileController`, `AdminController` | Riceve le richieste HTTP, valida input, chiama i Service, popola il Model e restituisce la View |
 | **Service** | `UserService`, `TransactionService`, `ExportService`, `CustomUserDetailsService` | Logica di business, validazione, orchestrazione delle operazioni |
 | **Repository** | `UserRepository`, `TransactionRepository`, `CategoryRepository`, `RoleRepository`, `PaymentMethodRepository` | Interfacciamento con il database tramite Spring Data JPA |
 | **Model** | `User`, `Role`, `Transaction`, `Category`, `PaymentMethod`, `TransactionType`, `RecurrenceType` | Entità JPA che mappano le tabelle del database |
@@ -223,11 +227,13 @@ users ────< user_roles >──── roles
 ## Sicurezza
 
 1. **Password**: hash BCrypt prima del salvataggio. Le password non vengono mai salvate in chiaro né restituite in nessuna risposta.
-2. **CSRF**: token CSRF di Spring Security incluso in tutti i form tramite `th:action` e campo `_csrf`.
-3. **Proprietà dati**: ogni query sulle transazioni filtra sempre per `user_id` dell'utente autenticato. Anche le operazioni di modifica/cancellazione verificano la proprietà.
-4. **Ruoli**: le rotte `/admin/**` sono accessibili solo a utenti con `ROLE_ADMIN`. La registrazione assegna automaticamente `ROLE_USER`.
-5. **Credenziali admin**: lette da `application.properties` tramite `@Value`, mai hardcoded nel codice.
-6. **Sessione**: il logout invalida la sessione HTTP.
+2. **Registrazione**: la password viene validata lato client (forza) e lato server (regex: minimo 8 caratteri, maiuscola, minuscola, carattere speciale).
+3. **Profilo**: l'utente può cambiare password (previa verifica della password corrente) o eliminare il proprio account (con conferma tramite password corrente).
+4. **CSRF**: token CSRF di Spring Security incluso in tutti i form tramite `th:action` e campo `_csrf`.
+5. **Proprietà dati**: ogni query sulle transazioni filtra sempre per `user_id` dell'utente autenticato. Anche le operazioni di modifica/cancellazione verificano la proprietà.
+6. **Ruoli**: le rotte `/admin/**` sono accessibili solo a utenti con `ROLE_ADMIN`. La registrazione assegna automaticamente `ROLE_USER`.
+7. **Credenziali admin**: lette da `application.properties` tramite `@Value`, mai hardcoded nel codice.
+8. **Sessione**: il logout invalida la sessione HTTP.
 
 ---
 

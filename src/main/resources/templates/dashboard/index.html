@@ -50,6 +50,26 @@
         </div>
     </div>
 
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Andamento Saldo</h5>
+            <div>
+                <button id="resetZoomBtn" class="btn btn-sm btn-outline-secondary" style="display:none;" onclick="resetBalanceChartZoom()">
+                    <i class="bi bi-zoom-out"></i> Reset zoom
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div th:if="${#lists.isEmpty(transactions)}" class="text-center py-4">
+                <i class="bi bi-bar-chart fs-1 text-muted"></i>
+                <p class="text-muted mt-2">Nessuna transazione da mostrare nel grafico.</p>
+            </div>
+            <div th:unless="${#lists.isEmpty(transactions)}">
+                <canvas id="balanceChart" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h5 class="mb-0"><i class="bi bi-clock-history"></i> Transazioni Recenti</h5>
@@ -96,6 +116,144 @@
             </div>
         </div>
     </div>
+
+<script>
+const chartData = [(${chartData})];
+
+Chart.register(ChartZoom, {
+    id: 'balanceBackground',
+    beforeDraw: function(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea) return;
+        const yZero = scales.y.getPixelForValue(0);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+        ctx.clip();
+        if (yZero >= chartArea.top && yZero <= chartArea.bottom) {
+            ctx.fillStyle = 'rgba(40, 167, 69, 0.10)';
+            ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, yZero - chartArea.top);
+            ctx.fillStyle = 'rgba(220, 53, 69, 0.10)';
+            ctx.fillRect(chartArea.left, yZero, chartArea.right - chartArea.left, chartArea.bottom - yZero);
+        } else if (yZero < chartArea.top) {
+            ctx.fillStyle = 'rgba(40, 167, 69, 0.10)';
+            ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+        } else {
+            ctx.fillStyle = 'rgba(220, 53, 69, 0.10)';
+            ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+        }
+        ctx.restore();
+    }
+});
+
+function resetBalanceChartZoom() {
+    if (window.balanceChart) {
+        window.balanceChart.resetZoom();
+    }
+}
+
+function initBalanceChart() {
+    const ctx = document.getElementById('balanceChart');
+    if (!ctx || !chartData || chartData.length === 0) return;
+
+    const labels = chartData.map(p => p.d);
+    const values = chartData.map(p => p.b);
+
+    window.balanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Saldo (€)',
+                data: values,
+                borderColor: '#495057',
+                stepped: true,
+                fill: false,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#495057',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '€ ' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        drag: {
+                            enabled: true,
+                            backgroundColor: 'rgba(13,110,253,0.08)',
+                            borderColor: '#0d6efd',
+                            borderWidth: 1
+                        },
+                        mode: 'x',
+                        onZoomComplete: function() {
+                            const btn = document.getElementById('resetZoomBtn');
+                            if (btn) btn.style.display = 'inline-block';
+                        }
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Data'
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 15
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Saldo (€)'
+                    },
+                    beginAtZero: false,
+                    grid: {
+                        color: function(context) {
+                            return context.tick.value === 0 ? '#0d6efd' : 'rgba(0,0,0,0.08)';
+                        },
+                        lineWidth: function(context) {
+                            return context.tick.value === 0 ? 2 : 1;
+                        }
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return '€ ' + value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initBalanceChart);
+</script>
 </div>
 </body>
 </html>
