@@ -9,7 +9,7 @@ import com.portfolio.financetracker.model.User;
 import com.portfolio.financetracker.repository.RoleRepository;
 import com.portfolio.financetracker.repository.TransactionRepository;
 import com.portfolio.financetracker.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 

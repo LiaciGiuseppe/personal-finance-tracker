@@ -1,16 +1,27 @@
 package com.portfolio.financetracker.controller;
 
 import com.portfolio.financetracker.dto.TransactionFilterDto;
-import com.portfolio.financetracker.model.*;
+import com.portfolio.financetracker.model.RecurrenceType;
+import com.portfolio.financetracker.model.Transaction;
+import com.portfolio.financetracker.model.TransactionType;
+import com.portfolio.financetracker.model.User;
 import com.portfolio.financetracker.repository.CategoryRepository;
 import com.portfolio.financetracker.repository.PaymentMethodRepository;
 import com.portfolio.financetracker.repository.UserRepository;
 import com.portfolio.financetracker.service.TransactionService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,9 +45,14 @@ public class TransactionController {
 
     @GetMapping
     public String listTransactions(@ModelAttribute TransactionFilterDto filter,
-                                   @AuthenticationPrincipal UserDetails userDetails, Model model) {
+                                    @RequestParam(defaultValue = "0") int page,
+                                    @AuthenticationPrincipal UserDetails userDetails, Model model) {
         User currentUser = getUser(userDetails);
-        model.addAttribute("transactions", transactionService.findAll(currentUser, filter));
+        PageRequest pageable = PageRequest.of(page, 10, Sort.by(Sort.Direction.DESC, "date"));
+        Page<Transaction> transactionPage = transactionService.findAll(currentUser, filter, pageable);
+        model.addAttribute("transactions", transactionPage.getContent());
+        model.addAttribute("currentPage", page);
+        model.addAttribute("totalPages", transactionPage.getTotalPages());
         model.addAttribute("filter", filter);
         model.addAttribute("categories", categoryRepository.findAll());
         return "transactions/list";

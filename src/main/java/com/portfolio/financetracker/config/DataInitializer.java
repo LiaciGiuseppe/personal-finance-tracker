@@ -1,7 +1,13 @@
 package com.portfolio.financetracker.config;
 
-import com.portfolio.financetracker.model.*;
-import com.portfolio.financetracker.repository.*;
+import com.portfolio.financetracker.model.Category;
+import com.portfolio.financetracker.model.PaymentMethod;
+import com.portfolio.financetracker.model.Role;
+import com.portfolio.financetracker.model.User;
+import com.portfolio.financetracker.repository.CategoryRepository;
+import com.portfolio.financetracker.repository.PaymentMethodRepository;
+import com.portfolio.financetracker.repository.RoleRepository;
+import com.portfolio.financetracker.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,7 +50,7 @@ public class DataInitializer implements CommandLineRunner {
         Role userRole = roleRepository.save(Role.builder().name("ROLE_USER").build());
         Role adminRole = roleRepository.save(Role.builder().name("ROLE_ADMIN").build());
 
-        List<Category> categories = categoryRepository.saveAll(List.of(
+        categoryRepository.saveAll(List.of(
                 Category.builder().name("Alimentari").icon("bi-cart").build(),
                 Category.builder().name("Stipendio").icon("bi-briefcase").build(),
                 Category.builder().name("Svago").icon("bi-controller").build(),
@@ -57,7 +63,7 @@ public class DataInitializer implements CommandLineRunner {
                 Category.builder().name("Altro").icon("bi-three-dots").build()
         ));
 
-        List<PaymentMethod> paymentMethods = paymentMethodRepository.saveAll(List.of(
+        paymentMethodRepository.saveAll(List.of(
                 PaymentMethod.builder().name("Contanti").build(),
                 PaymentMethod.builder().name("Carta di Credito").build(),
                 PaymentMethod.builder().name("Carta di Debito").build(),

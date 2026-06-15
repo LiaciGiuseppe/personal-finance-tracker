@@ -7,6 +7,9 @@ import com.portfolio.financetracker.model.TransactionType;
 import com.portfolio.financetracker.model.User;
 import com.portfolio.financetracker.repository.TransactionRepository;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,11 @@ public class TransactionService {
     public List<Transaction> findAll(User currentUser, TransactionFilterDto filter) {
         Specification<Transaction> spec = buildSpecification(currentUser, filter);
         return transactionRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date"));
+    }
+
+    public Page<Transaction> findAll(User currentUser, TransactionFilterDto filter, Pageable pageable) {
+        Specification<Transaction> spec = buildSpecification(currentUser, filter);
+        return transactionRepository.findAll(spec, pageable);
     }
 
     /**

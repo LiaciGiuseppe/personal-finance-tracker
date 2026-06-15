@@ -51,13 +51,8 @@
     </div>
 
     <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header">
             <h5 class="mb-0"><i class="bi bi-graph-up"></i> Andamento Saldo</h5>
-            <div>
-                <button id="resetZoomBtn" class="btn btn-sm btn-outline-secondary" style="display:none;" onclick="resetBalanceChartZoom()">
-                    <i class="bi bi-zoom-out"></i> Reset zoom
-                </button>
-            </div>
         </div>
         <div class="card-body">
             <div th:if="${#lists.isEmpty(transactions)}" class="text-center py-4">
@@ -66,6 +61,16 @@
             </div>
             <div th:unless="${#lists.isEmpty(transactions)}">
                 <canvas id="balanceChart" width="800" height="300"></canvas>
+                <div id="chartScrollerContainer" class="px-2 pt-1" style="display:none;">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-chevron-left text-muted small"></i>
+                        <input type="range" id="panSlider" min="0" max="1000" value="0" class="form-range" />
+                        <i class="bi bi-chevron-right text-muted small"></i>
+                    </div>
+                    <div class="text-center">
+                        <small class="text-muted">Trascina lo slider per navigare il grafico</small>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -117,6 +122,12 @@
         </div>
     </div>
 
+<style>
+#balanceChart { cursor: grab; }
+#balanceChart:active { cursor: grabbing; }
+#panSlider { cursor: pointer; }
+</style>
+
 <script>
 const chartData = [(${chartData})];
 
@@ -130,26 +141,53 @@ Chart.register(ChartZoom, {
         ctx.beginPath();
         ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
         ctx.clip();
-        if (yZero >= chartArea.top && yZero <= chartArea.bottom) {
-            ctx.fillStyle = 'rgba(40, 167, 69, 0.10)';
-            ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, yZero - chartArea.top);
-            ctx.fillStyle = 'rgba(220, 53, 69, 0.10)';
-            ctx.fillRect(chartArea.left, yZero, chartArea.right - chartArea.left, chartArea.bottom - yZero);
-        } else if (yZero < chartArea.top) {
-            ctx.fillStyle = 'rgba(40, 167, 69, 0.10)';
-            ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
-        } else {
-            ctx.fillStyle = 'rgba(220, 53, 69, 0.10)';
-            ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
-        }
+        ctx.fillStyle = yZero >= chartArea.top && yZero <= chartArea.bottom
+            ? 'rgba(40, 167, 69, 0.10)' : 'rgba(40, 167, 69, 0.06)';
+        ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, Math.max(yZero, chartArea.top) - chartArea.top);
+        ctx.fillStyle = yZero >= chartArea.top && yZero <= chartArea.bottom
+            ? 'rgba(220, 53, 69, 0.10)' : 'rgba(220, 53, 69, 0.06)';
+        ctx.fillRect(chartArea.left, Math.max(yZero, chartArea.top), chartArea.right - chartArea.left, chartArea.bottom - Math.max(yZero, chartArea.top));
         ctx.restore();
+    },
+    afterDraw: function(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea) return;
+        const yZero = scales.y.getPixelForValue(0);
+        if (yZero >= chartArea.top && yZero <= chartArea.bottom) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.moveTo(chartArea.left, yZero);
+            ctx.lineTo(chartArea.right, yZero);
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 });
 
-function resetBalanceChartZoom() {
-    if (window.balanceChart) {
-        window.balanceChart.resetZoom();
+function updatePanSlider() {
+    const chart = window.balanceChart;
+    if (!chart) return;
+    const slider = document.getElementById('panSlider');
+    const totalLabels = chart.data.labels.length;
+    const visibleMin = chart.scales.x.min;
+    const visibleMax = chart.scales.x.max;
+    const visibleRange = visibleMax - visibleMin;
+    const totalRange = totalLabels - 1;
+    const maxScroll = totalRange - visibleRange;
+    if (maxScroll > 0) {
+        const fraction = (visibleMin / maxScroll);
+        slider.value = Math.round(fraction * 1000);
     }
+}
+
+function showZoomUI() {
+    const chart = window.balanceChart;
+    const hasScroll = chart && (chart.data.labels.length - 1 - (chart.scales.x.max - chart.scales.x.min)) > 0;
+    document.getElementById('chartScrollerContainer').style.display = hasScroll ? 'block' : 'none';
+    updatePanSlider();
 }
 
 function initBalanceChart() {
@@ -158,6 +196,11 @@ function initBalanceChart() {
 
     const labels = chartData.map(p => p.d);
     const values = chartData.map(p => p.b);
+    const pointColors = values.map(v => v >= 0 ? 'rgb(40, 167, 69)' : 'rgb(220, 53, 69)');
+    const borderColors = values.map((v, i) => {
+        if (i === 0) return v >= 0 ? 'rgb(40, 167, 69)' : 'rgb(220, 53, 69)';
+        return values[i - 1] >= 0 ? 'rgb(40, 167, 69)' : 'rgb(220, 53, 69)';
+    });
 
     window.balanceChart = new Chart(ctx, {
         type: 'line',
@@ -166,13 +209,19 @@ function initBalanceChart() {
             datasets: [{
                 label: 'Saldo (€)',
                 data: values,
-                borderColor: '#495057',
                 stepped: true,
                 fill: false,
                 pointRadius: 3,
                 pointHoverRadius: 6,
-                pointBackgroundColor: '#495057',
-                borderWidth: 2
+                pointBackgroundColor: pointColors,
+                pointBorderColor: pointColors,
+                borderColor: borderColors,
+                borderWidth: 2,
+                segment: {
+                    borderColor: function(ctx) {
+                        return ctx.p1.parsed.y >= 0 ? 'rgb(40, 167, 69)' : 'rgb(220, 53, 69)';
+                    }
+                }
             }]
         },
         options: {
@@ -205,13 +254,15 @@ function initBalanceChart() {
                         },
                         mode: 'x',
                         onZoomComplete: function() {
-                            const btn = document.getElementById('resetZoomBtn');
-                            if (btn) btn.style.display = 'inline-block';
+                            showZoomUI();
                         }
                     },
                     pan: {
                         enabled: true,
-                        mode: 'x'
+                        mode: 'x',
+                        onPanComplete: function() {
+                            updatePanSlider();
+                        }
                     }
                 },
             },
@@ -235,10 +286,10 @@ function initBalanceChart() {
                     beginAtZero: false,
                     grid: {
                         color: function(context) {
-                            return context.tick.value === 0 ? '#0d6efd' : 'rgba(0,0,0,0.08)';
+                            return context.tick.value === 0 ? '#adb5bd' : 'rgba(0,0,0,0.06)';
                         },
                         lineWidth: function(context) {
-                            return context.tick.value === 0 ? 2 : 1;
+                            return context.tick.value === 0 ? 1 : 1;
                         }
                     },
                     ticks: {
@@ -249,6 +300,22 @@ function initBalanceChart() {
                 }
             }
         }
+    });
+
+    document.getElementById('panSlider').addEventListener('input', function() {
+        const chart = window.balanceChart;
+        if (!chart) return;
+        const totalLabels = chart.data.labels.length;
+        const visibleMin = chart.scales.x.min;
+        const visibleMax = chart.scales.x.max;
+        const visibleRange = visibleMax - visibleMin;
+        const totalRange = totalLabels - 1;
+        const maxScroll = totalRange - visibleRange;
+        if (maxScroll <= 0) return;
+        const fraction = parseFloat(this.value) / 1000;
+        const newMin = Math.min(fraction * maxScroll, totalRange - visibleRange);
+        const newMax = newMin + visibleRange;
+        chart.zoomScale('x', { min: newMin, max: newMax });
     });
 }
 

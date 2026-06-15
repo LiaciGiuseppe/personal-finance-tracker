@@ -1,15 +1,9 @@
 package com.portfolio.financetracker.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "payment_methods")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class PaymentMethod {
 
     @Id
@@ -18,4 +12,50 @@ public class PaymentMethod {
 
     @Column(nullable = false)
     private String name;
+
+    public PaymentMethod() {}
+
+    public PaymentMethod(Long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Long id;
+        private String name;
+
+        public Builder id(Long id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public PaymentMethod build() {
+            return new PaymentMethod(id, name);
+        }
+    }
 }

@@ -27,6 +27,7 @@
         </div>
         <div class="card-body">
             <form th:action="@{/transactions}" method="get" class="row g-3">
+                <input type="hidden" name="page" value="0" />
                 <div class="col-md-3">
                     <label for="dateFrom" class="form-label">Data da</label>
                     <input type="date" id="dateFrom" name="dateFrom" th:value="${filter?.dateFrom}"
@@ -112,6 +113,37 @@
                         </tbody>
                     </table>
                 </div>
+
+                <nav th:if="${totalPages > 1}" aria-label="Navigazione pagine">
+                    <ul class="pagination justify-content-center mt-3">
+                        <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                            <a class="page-link" th:href="@{/transactions(page=0, dateFrom=${filter?.dateFrom}, dateTo=${filter?.dateTo}, categoryId=${filter?.categoryId})}">
+                                <i class="bi bi-chevron-bar-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                            <a class="page-link" th:href="@{/transactions(page=${currentPage - 1}, dateFrom=${filter?.dateFrom}, dateTo=${filter?.dateTo}, categoryId=${filter?.categoryId})}">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}"
+                            th:classappend="${i == currentPage} ? 'active'"
+                            th:if="${i >= currentPage - 2 and i <= currentPage + 2}">
+                            <a class="page-link" th:href="@{/transactions(page=${i}, dateFrom=${filter?.dateFrom}, dateTo=${filter?.dateTo}, categoryId=${filter?.categoryId})}"
+                               th:text="${i + 1}">1</a>
+                        </li>
+                        <li class="page-item" th:classappend="${currentPage == totalPages - 1} ? 'disabled'">
+                            <a class="page-link" th:href="@{/transactions(page=${currentPage + 1}, dateFrom=${filter?.dateFrom}, dateTo=${filter?.dateTo}, categoryId=${filter?.categoryId})}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item" th:classappend="${currentPage == totalPages - 1} ? 'disabled'">
+                            <a class="page-link" th:href="@{/transactions(page=${totalPages - 1}, dateFrom=${filter?.dateFrom}, dateTo=${filter?.dateTo}, categoryId=${filter?.categoryId})}">
+                                <i class="bi bi-chevron-bar-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>

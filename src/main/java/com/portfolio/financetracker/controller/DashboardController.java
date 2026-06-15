@@ -56,7 +56,7 @@ public class DashboardController {
                 .limit(5)
                 .toList();
 
-        Map<String, BigDecimal> summary = transactionService.calculateSummary(limited);
+        Map<String, BigDecimal> summary = transactionService.calculateSummary(allTransactions);
 
         model.addAttribute("transactions", limited);
         model.addAttribute("summary", summary);
