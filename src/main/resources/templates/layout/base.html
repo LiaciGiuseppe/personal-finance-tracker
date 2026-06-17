@@ -91,5 +91,12 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <meta id="vapid-public-key" th:content="${@environment.getProperty('vapid.public.key')}"
+          sec:authorize="hasRole('USER')"/>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <script th:src="@{/js/push-init.js}" sec:authorize="hasRole('USER')"></script>
 </body>
 </html>

@@ -27,6 +27,8 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles;
 
+    private Boolean negativeAlertSent = false;
+
     public User() {}
 
     public User(Long id, String username, String password, Boolean enabled, Set<Role> roles) {
@@ -35,6 +37,7 @@ public class User {
         this.password = password;
         this.enabled = enabled;
         this.roles = roles;
+        this.negativeAlertSent = false;
     }
 
     public Long getId() {
@@ -77,6 +80,14 @@ public class User {
         this.roles = roles;
     }
 
+    public boolean getNegativeAlertSent() {
+        return negativeAlertSent != null && negativeAlertSent;
+    }
+
+    public void setNegativeAlertSent(boolean negativeAlertSent) {
+        this.negativeAlertSent = negativeAlertSent;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -87,6 +98,7 @@ public class User {
         private String password;
         private Boolean enabled = true;
         private Set<Role> roles;
+    private Boolean negativeAlertSent = false;
 
         public Builder id(Long id) {
             this.id = id;
@@ -113,8 +125,15 @@ public class User {
             return this;
         }
 
+        public Builder negativeAlertSent(boolean negativeAlertSent) {
+            this.negativeAlertSent = negativeAlertSent;
+            return this;
+        }
+
         public User build() {
-            return new User(id, username, password, enabled, roles);
+            User user = new User(id, username, password, enabled, roles);
+            user.negativeAlertSent = negativeAlertSent;
+            return user;
         }
     }
 }

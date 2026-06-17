@@ -33,6 +33,7 @@ Applicazione web per la gestione delle finanze personali, sviluppata con **Sprin
 - Registrazione con indicatore di sicurezza della password (forza: scarsa/buona/eccellente)
 - Gestire il proprio profilo: cambio password ed eliminazione account
 - Gestire utenti con autenticazione e ruoli (USER e ADMIN)
+- **Notifiche push browser** in tempo reale quando il saldo va in negativo (tramite protocollo Web Push VAPID)
 
 ---
 
@@ -49,6 +50,8 @@ Applicazione web per la gestione delle finanze personali, sviluppata con **Sprin
 | **SQLite** | 3.45.3.0 | Database embedded |
 | **Hibernate** | 6.4 | ORM (Object-Relational Mapping) |
 | **Apache POI** | 5.2.5 | Generazione file Excel (.xlsx) |
+| **web-push** | 5.1.1 | Web Push Notification (protocollo VAPID) |
+| **BouncyCastle** | 1.70 | Crittografia VAPID |
 | **Lombok** | 1.18 | Riduzione boilerplate Java |
 | **Bootstrap 5** | 5.3.3 | CSS framework (via CDN) |
 | **Chart.js** | 4.4.7 | Grafici dashboard (via CDN) |
@@ -69,6 +72,8 @@ Le dipendenze principali includono:
 - `org.hibernate.orm:hibernate-community-dialects` — dialect Hibernate per SQLite
 - `org.apache.poi:poi-ooxml` — generazione file Excel
 - `org.projectlombok:lombok` — annotazioni per ridurre codice boilerplate
+- `nl.martijndwars:web-push` — invio notifiche push browser (VAPID)
+- `org.bouncycastle:bcprov-jdk15on` — provider crittografico per VAPID
 
 ---
 
@@ -102,11 +107,11 @@ L'applicazione segue il pattern **Model-View-Controller** implementato da Spring
 
 | Livello | Componenti | Responsabilità |
 |---|---|---|
-| **Controller** | `AuthController`, `DashboardController`, `TransactionController`, `ExportController`, `ProfileController`, `AdminController` | Riceve le richieste HTTP, valida input, chiama i Service, popola il Model e restituisce la View |
-| **Service** | `UserService`, `TransactionService`, `ExportService`, `CustomUserDetailsService` | Logica di business, validazione, orchestrazione delle operazioni |
-| **Repository** | `UserRepository`, `TransactionRepository`, `CategoryRepository`, `RoleRepository`, `PaymentMethodRepository` | Interfacciamento con il database tramite Spring Data JPA |
-| **Model** | `User`, `Role`, `Transaction`, `Category`, `PaymentMethod`, `TransactionType`, `RecurrenceType` | Entità JPA che mappano le tabelle del database |
-| **DTO** | `UserRegistrationDto`, `TransactionFilterDto` | Oggetti per il trasporto dati tra View e Controller |
+| **Controller** | `AuthController`, `DashboardController`, `TransactionController`, `ExportController`, `ProfileController`, `AdminController`, `PushController` | Riceve le richieste HTTP, valida input, chiama i Service, popola il Model e restituisce la View |
+| **Service** | `UserService`, `TransactionService`, `ExportService`, `CustomUserDetailsService`, `PushNotificationService` | Logica di business, validazione, orchestrazione delle operazioni |
+| **Repository** | `UserRepository`, `TransactionRepository`, `CategoryRepository`, `RoleRepository`, `PaymentMethodRepository`, `PushSubscriptionRepository` | Interfacciamento con il database tramite Spring Data JPA |
+| **Model** | `User`, `Role`, `Transaction`, `Category`, `PaymentMethod`, `TransactionType`, `RecurrenceType`, `PushSubscription` | Entità JPA che mappano le tabelle del database |
+| **DTO** | `UserRegistrationDto`, `TransactionFilterDto`, `PushSubscriptionDto` | Oggetti per il trasporto dati tra View e Controller |
 | **View** | Template Thymeleaf (`.html`) | Renderizzazione lato server con Bootstrap 5 |
 | **Config** | `SecurityConfig`, `DataInitializer` | Configurazione sicurezza e dati iniziali |
 
@@ -115,12 +120,12 @@ L'applicazione segue il pattern **Model-View-Controller** implementato da Spring
 ```
 com.portfolio.financetracker/
 ├── config/              # Configurazioni (SecurityConfig, DataInitializer)
-├── controller/          # Controller MVC (Auth, Dashboard, Transaction, Export, Admin)
-├── dto/                 # Data Transfer Objects (UserRegistrationDto, TransactionFilterDto)
+├── controller/          # Controller MVC + REST (Auth, Dashboard, Transaction, Export, Admin, Push)
+├── dto/                 # Data Transfer Objects (UserRegistrationDto, TransactionFilterDto, PushSubscriptionDto)
 ├── exception/           # Eccezioni custom e GlobalExceptionHandler
-├── model/               # Entità JPA (User, Role, Transaction, Category, PaymentMethod, enums)
+├── model/               # Entità JPA (User, Role, Transaction, Category, PaymentMethod, PushSubscription, enums)
 ├── repository/          # Repository Spring Data JPA
-├── service/             # Logica di business (UserService, TransactionService, ExportService, CustomUserDetailsService)
+├── service/             # Logica di business (UserService, TransactionService, ExportService, CustomUserDetailsService, PushNotificationService)
 └── FinanceTrackerApplication.java  # Classe main
 ```
 
@@ -139,8 +144,9 @@ com.portfolio.financetracker/
 **Configurazione sicurezza (SecurityConfig.java):**
 
 - `BCryptPasswordEncoder` per l'hashing delle password
-- Rotte pubbliche: `/`, `/register`, `/login`, `/css/**`, `/js/**`, `/webjars/**`
+- Rotte pubbliche: `/`, `/register`, `/login`, `/css/**`, `/js/**`, `/sw.js`, `/icons/**`, `/webjars/**`
 - Rotte admin: `/admin/**` richiede ruolo `ROLE_ADMIN`
+- Rotte push: `/api/push/**` richiede ruolo `ROLE_USER`
 - Ogni altra rotta richiede autenticazione
 - Protezione CSRF attiva su tutti i form POST
 - Login form-based con pagina personalizzata
@@ -170,9 +176,11 @@ com.portfolio.financetracker/
 ```
 users ────< user_roles >──── roles
   │
-  └───< transactions >─── category
-              │
-              └─── payment_method
+  ├───< transactions >─── category
+  │           │
+  │           └─── payment_method
+  │
+  └───< push_subscriptions
 ```
 
 ### Dettaglio entità
@@ -184,6 +192,7 @@ users ────< user_roles >──── roles
 | username | String (UNIQUE) | È l'email dell'utente |
 | password | String (NOT NULL) | Hash BCrypt |
 | enabled | Boolean | Default true |
+| negativeAlertSent | Boolean | Flag anti-notifiche duplicate (default false) |
 | roles | Set<Role> | ManyToMany EAGER |
 
 **Role**
@@ -222,6 +231,16 @@ users ────< user_roles >──── roles
 | id | Long (PK) | Auto-generato |
 | name | String (NOT NULL) | Es. "Carta di Credito", "PayPal" |
 
+**PushSubscription**
+| Campo | Tipo | Note |
+|---|---|---|
+| id | Long (PK) | Auto-generato |
+| endpoint | String (NOT NULL) | URL univoco del browser |
+| p256dh | String (NOT NULL) | Chiave pubblica browser |
+| auth | String (NOT NULL) | Secret browser |
+| user | User (ManyToOne) | Proprietario della subscription |
+| createdAt | LocalDateTime | Auto-impostato @PrePersist |
+
 ---
 
 ## Sicurezza
@@ -229,11 +248,12 @@ users ────< user_roles >──── roles
 1. **Password**: hash BCrypt prima del salvataggio. Le password non vengono mai salvate in chiaro né restituite in nessuna risposta.
 2. **Registrazione**: la password viene validata lato client (forza) e lato server (regex: minimo 8 caratteri, maiuscola, minuscola, carattere speciale).
 3. **Profilo**: l'utente può cambiare password (previa verifica della password corrente) o eliminare il proprio account (con conferma tramite password corrente).
-4. **CSRF**: token CSRF di Spring Security incluso in tutti i form tramite `th:action` e campo `_csrf`.
+4. **CSRF**: token CSRF di Spring Security incluso in tutti i form tramite `th:action` e campo `_csrf`. Le richieste REST a `/api/push/*` includono il token nell'header `X-CSRF-TOKEN` letto da meta tag.
 5. **Proprietà dati**: ogni query sulle transazioni filtra sempre per `user_id` dell'utente autenticato. Anche le operazioni di modifica/cancellazione verificano la proprietà.
-6. **Ruoli**: le rotte `/admin/**` sono accessibili solo a utenti con `ROLE_ADMIN`. La registrazione assegna automaticamente `ROLE_USER`.
+6. **Ruoli**: le rotte `/admin/**` sono accessibili solo a utenti con `ROLE_ADMIN`. La registrazione assegna automaticamente `ROLE_USER`. Le rotte `/api/push/**` richiedono `ROLE_USER`.
 7. **Credenziali admin**: lette da `application.properties` tramite `@Value`, mai hardcoded nel codice.
 8. **Sessione**: il logout invalida la sessione HTTP.
+9. **Notifiche push**: protocollo VAPID con coppia di chiavi pubblica/privata. Le subscription sono salvate nel DB (`push_subscriptions`) e associate all'utente.
 
 ---
 

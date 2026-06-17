@@ -2,10 +2,12 @@ package com.portfolio.financetracker.service;
 
 import com.portfolio.financetracker.dto.TransactionFilterDto;
 import com.portfolio.financetracker.exception.ResourceNotFoundException;
+import com.portfolio.financetracker.model.Role;
 import com.portfolio.financetracker.model.Transaction;
 import com.portfolio.financetracker.model.TransactionType;
 import com.portfolio.financetracker.model.User;
 import com.portfolio.financetracker.repository.TransactionRepository;
+import com.portfolio.financetracker.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -24,9 +27,15 @@ import java.util.Map;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final UserRepository userRepository;
+    private final PushNotificationService pushNotificationService;
 
-    public TransactionService(TransactionRepository transactionRepository) {
+    public TransactionService(TransactionRepository transactionRepository,
+                              UserRepository userRepository,
+                              PushNotificationService pushNotificationService) {
         this.transactionRepository = transactionRepository;
+        this.userRepository = userRepository;
+        this.pushNotificationService = pushNotificationService;
     }
 
     /**
@@ -70,9 +79,12 @@ public class TransactionService {
      * @param currentUser utente corrente
      * @return la transazione salvata
      */
+    @Transactional
     public Transaction save(Transaction transaction, User currentUser) {
         transaction.setUser(currentUser);
-        return transactionRepository.save(transaction);
+        Transaction saved = transactionRepository.save(transaction);
+        checkAndNotifyNegativeBalance(currentUser);
+        return saved;
     }
 
     /**
@@ -83,6 +95,7 @@ public class TransactionService {
      * @param currentUser utente corrente
      * @return la transazione aggiornata
      */
+    @Transactional
     public Transaction update(Long id, Transaction updatedData, User currentUser) {
         Transaction existing = findById(id, currentUser);
         existing.setAmount(updatedData.getAmount());
@@ -94,7 +107,9 @@ public class TransactionService {
         existing.setIsPlanned(updatedData.getIsPlanned());
         existing.setRecurrence(updatedData.getRecurrence());
         existing.setPlannedDate(updatedData.getPlannedDate());
-        return transactionRepository.save(existing);
+        Transaction saved = transactionRepository.save(existing);
+        checkAndNotifyNegativeBalance(currentUser);
+        return saved;
     }
 
     /**
@@ -103,9 +118,11 @@ public class TransactionService {
      * @param id          id transazione
      * @param currentUser utente corrente
      */
+    @Transactional
     public void delete(Long id, User currentUser) {
         Transaction transaction = findById(id, currentUser);
         transactionRepository.delete(transaction);
+        checkAndNotifyNegativeBalance(currentUser);
     }
 
     /**
@@ -131,6 +148,36 @@ public class TransactionService {
         summary.put("totalExpense", totalExpense);
         summary.put("balance", totalIncome.subtract(totalExpense));
         return summary;
+    }
+
+    private void checkAndNotifyNegativeBalance(User user) {
+        boolean hasRoleUser = user.getRoles().stream()
+                .map(Role::getName)
+                .anyMatch("ROLE_USER"::equals);
+        if (!hasRoleUser) {
+            return;
+        }
+
+        List<Transaction> allTransactions = transactionRepository.findAll(
+                (root, query, cb) -> cb.equal(root.get("user").get("id"), user.getId())
+        );
+
+        BigDecimal balance = allTransactions.stream()
+                .map(t -> t.getType() == TransactionType.INCOME ? t.getAmount() : t.getAmount().negate())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (balance.compareTo(BigDecimal.ZERO) < 0) {
+            if (!user.getNegativeAlertSent()) {
+                pushNotificationService.sendNegativeBalanceAlert(user, balance);
+                user.setNegativeAlertSent(true);
+                userRepository.save(user);
+            }
+        } else {
+            if (user.getNegativeAlertSent()) {
+                user.setNegativeAlertSent(false);
+                userRepository.save(user);
+            }
+        }
     }
 
     /**
