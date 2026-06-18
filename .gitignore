@@ -14,3 +14,8 @@ target/
 .project
 .classpath
 /bin/
+
+# Environment variables (secrets)
+.env
+.env.local
+.env*.local
