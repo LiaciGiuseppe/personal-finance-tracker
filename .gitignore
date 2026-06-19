@@ -19,3 +19,6 @@ target/
 .env
 .env.local
 .env*.local
+
+# Avvio locale
+start.ps1

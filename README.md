@@ -52,7 +52,6 @@ Applicazione web per la gestione delle finanze personali, sviluppata con **Sprin
 | **Apache POI** | 5.2.5 | Generazione file Excel (.xlsx) |
 | **web-push** | 5.1.1 | Web Push Notification (protocollo VAPID) |
 | **BouncyCastle** | 1.70 | Crittografia VAPID |
-| **Lombok** | 1.18 | Riduzione boilerplate Java |
 | **Bootstrap 5** | 5.3.3 | CSS framework (via CDN) |
 | **Chart.js** | 4.4.7 | Grafici dashboard (via CDN) |
 | **chartjs-plugin-zoom** | 2.2.0 | Zoom/Pan grafico (via CDN) |
@@ -71,7 +70,6 @@ Le dipendenze principali includono:
 - `org.xerial:sqlite-jdbc` — driver JDBC per SQLite
 - `org.hibernate.orm:hibernate-community-dialects` — dialect Hibernate per SQLite
 - `org.apache.poi:poi-ooxml` — generazione file Excel
-- `org.projectlombok:lombok` — annotazioni per ridurre codice boilerplate
 - `nl.martijndwars:web-push` — invio notifiche push browser (VAPID)
 - `org.bouncycastle:bcprov-jdk15on` — provider crittografico per VAPID
 
@@ -253,7 +251,7 @@ users ────< user_roles >──── roles
 6. **Ruoli**: le rotte `/admin/**` sono accessibili solo a utenti con `ROLE_ADMIN`. La registrazione assegna automaticamente `ROLE_USER`. Le rotte `/api/push/**` richiedono `ROLE_USER`.
 7. **Credenziali admin**: lette da `application.properties` tramite `@Value`, mai hardcoded nel codice.
 8. **Sessione**: il logout invalida la sessione HTTP.
-9. **Notifiche push**: protocollo VAPID con coppia di chiavi pubblica/privata. Le subscription sono salvate nel DB (`push_subscriptions`) e associate all'utente.
+9. **Notifiche push**: protocollo VAPID con coppia di chiavi pubblica/privata. Le chiavi vanno impostate come variabili d'ambiente (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) — su Windows usa lo script `start.ps1` fornito (non tracciato da Git). Le subscription sono salvate nel DB (`push_subscriptions`) e associate all'utente.
 
 ---
 
@@ -269,14 +267,25 @@ users ────< user_roles >──── roles
 
 ## Avvio rapido
 
-### Da terminale
+### Da terminale (Windows — PowerShell)
 
-```bash
+```powershell
 # Clona il repository
 git clone https://github.com/tuo-username/finance-tracker.git
 cd finance-tracker
 
-# Compila e avvia
+# Avvia con VAPID keys (build + run)
+.\start.ps1
+```
+
+> **Nota:** il file `start.ps1` contiene le chiavi VAPID necessarie per le notifiche push. Non è tracciato da Git per motivi di sicurezza. In alternativa, imposta le variabili d'ambiente `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT` prima di avviare con `mvn spring-boot:run`.
+
+### Da terminale (Linux/macOS)
+
+```bash
+export VAPID_PUBLIC_KEY="<chiave_pubblica>"
+export VAPID_PRIVATE_KEY="<chiave_privata>"
+export VAPID_SUBJECT="mailto:admin@financetracker.local"
 mvn clean spring-boot:run
 ```
 
@@ -284,14 +293,10 @@ mvn clean spring-boot:run
 
 1. **File → Import → Maven → Existing Maven Projects**
 2. Seleziona la cartella del progetto
-3. Assicurati che **Lombok sia installato** in Eclipse:
-   - Scarica `lombok.jar` da https://projectlombok.org
-   - Esegui `java -jar lombok.jar`
-   - Seleziona il percorso di Eclipse.exe e installa
-4. **Project → Clean** (per sicurezza)
-5. Tasto destro sul progetto → **Run As → Maven build...**
-6. In `Goals` inserisci: `clean spring-boot:run`
-7. Apri il browser su `http://localhost:8081`
+3. **Project → Clean** (per sicurezza)
+4. Tasto destro sul progetto → **Run As → Maven build...**
+5. In `Goals` inserisci: `clean spring-boot:run -Dspring-boot.run.jvmArguments="-DVAPID_PUBLIC_KEY=... -DVAPID_PRIVATE_KEY=... -DVAPID_SUBJECT=mailto:admin@financetracker.local"`
+6. Apri il browser su `http://localhost:8081`
 
 ---
 
